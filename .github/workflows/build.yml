@@ -1,84 +1,289 @@
-name: Multi-Platform Build and Release
+name: Build and Release
 
 on:
   push:
     branches:
-      - electron_bundler
-    tags:
+      - master
+    tags-ignore:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      force_bump:
+        description: 'Force a specific version bump (overrides commit analysis)'
+        type: choice
+        default: 'auto'
+        options: [auto, patch, minor, major]
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────
+# JOB 1: Determine the next semantic version
+# ─────────────────────────────────────────────
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.calc.outputs.tag }}
+      version: ${{ steps.calc.outputs.version }}
     steps:
-      - name: Checkout lw.comm-server
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          path: lw.comm-server
+          fetch-depth: 0
 
-      - name: Install Linux Dependencies
-        if: matrix.os == 'ubuntu-latest'
+      - name: Get latest tag
+        id: base
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y icnsutils graphicsmagick xz-utils
+          tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          # Collect commit messages since last tag for analysis
+          git log "$tag..HEAD" --pretty=format:"%s" > commits.txt || true
+          echo "Commits since $tag:"
+          cat commits.txt
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          # Start with patch as default
+          bump="patch"
+
+          # Check for forced bump from workflow_dispatch input
+          if [[ "${{ github.event.inputs.force_bump }}" != "auto" && -n "${{ github.event.inputs.force_bump }}" ]]; then
+            bump="${{ github.event.inputs.force_bump }}"
+            echo "Force bump requested: $bump"
+          else
+            # Analyse commits for conventional commit keywords
+            if grep -qE "(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)" commits.txt; then
+              bump="major"
+            elif grep -qE "^feat(\(.+\))?:" commits.txt; then
+              bump="minor"
+            fi
+            echo "Commit-derived bump: $bump"
+          fi
+
+          echo "bump=$bump" >> $GITHUB_OUTPUT
+
+      - name: Calculate next version
+        id: calc
+        run: |
+          raw="${{ steps.base.outputs.tag }}"
+          raw="${raw#v}"   # strip leading 'v'
+          IFS='.' read -r major minor patch <<< "$raw"
+
+          case "${{ steps.bump.outputs.bump }}" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            *)     patch=$((patch+1)) ;;
+          esac
+
+          version="$major.$minor.$patch"
+          tag="v$version"
+          echo "Next version: $tag"
+          echo "tag=$tag"     >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Push version tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.calc.outputs.tag }}"
+          git push origin "${{ steps.calc.outputs.tag }}"
+
+  # ─────────────────────────────────────────────
+  # JOB 2: Build portable server packages
+  # One matrix entry per target platform.
+  # Produces a zip/tarball with everything needed
+  # to run the server — no installer, no Electron,
+  # no Tauri yet.
+  # ─────────────────────────────────────────────
+  build:
+    needs: version
+    strategy:
+      fail-fast: false   # don't cancel other platforms if one fails
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            archive_cmd: tar -czf
+            ext: tar.gz
+          - os: windows-latest
+            platform: windows
+            archive_cmd: 7z a -tzip
+            ext: zip
+          - os: macos-latest
+            platform: macos
+            archive_cmd: zip -r
+            ext: zip
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}   # build the exact tagged commit
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 18
           cache: 'npm'
-          cache-dependency-path: lw.comm-server/package-lock.json
 
-      - name: Clone and Build LaserWeb4
-        shell: bash
+      - name: Install dependencies
+        run: npm ci --omit=dev   # production deps only — no devDependencies in the release
+
+      - name: Stamp version into package.json
+        # Use the bare version number (no 'v' prefix) for npm
+        run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version --allow-same-version
+
+      # ── Linux ──────────────────────────────────
+      - name: Package (Linux)
+        if: matrix.platform == 'linux'
         run: |
-          git clone https://github.com/LaserWeb/LaserWeb4.git
-          cd LaserWeb4
-          git checkout dev-es6
-          npm install
-          npm run installdev
-          npm run bundle-dev
+          mkdir -p dist
+          tar -czf dist/lw.comm-server-${{ needs.version.outputs.tag }}-linux.tar.gz \
+            --exclude='.git' \
+            --exclude='dist' \
+            --exclude='node_modules/.cache' \
+            .
 
-      - name: Build lw.comm-server
-        shell: bash
+      # ── macOS ──────────────────────────────────
+      - name: Package (macOS)
+        if: matrix.platform == 'macos'
         run: |
-          cd lw.comm-server
-          npm install
-          ./node_modules/.bin/electron-rebuild
-          npm run dist
+          mkdir -p dist
+          zip -r dist/lw.comm-server-${{ needs.version.outputs.tag }}-macos.zip \
+            . \
+            -x '*.git*' 'dist/*' 'node_modules/.cache/*'
 
-      - name: Upload Artifacts
+      # ── Windows ────────────────────────────────
+      - name: Package (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          # Exclude .git and dist folder from the archive
+          $exclude = @('.git', 'dist')
+          $files = Get-ChildItem -Force | Where-Object { $_.Name -notin $exclude }
+          Compress-Archive -Path $files -DestinationPath "dist\lw.comm-server-${{ needs.version.outputs.tag }}-windows.zip"
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}
-          path: lw.comm-server/dist/
+          name: lw.comm-server-${{ matrix.platform }}
+          path: dist/*
+          retention-days: 7
 
+  # ─────────────────────────────────────────────
+  # JOB 3: Create the GitHub Release and attach
+  # all platform artifacts
+  # ─────────────────────────────────────────────
   release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download All Artifacts
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release-assets
-          merge-multiple: true
+          path: artifacts
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          prev=$(git describe --tags --abbrev=0 "${{ needs.version.outputs.tag }}^" 2>/dev/null || echo "")
+          if [ -n "$prev" ]; then
+            log=$(git log "$prev..${{ needs.version.outputs.tag }}" --pretty=format:"- %s (%h)" --no-merges)
+          else
+            log=$(git log "${{ needs.version.outputs.tag }}" --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          # Write to file to avoid quoting issues with multiline strings
+          echo "$log" > changelog.txt
+          cat changelog.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release-assets/*.AppImage
-            release-assets/*.deb
-            release-assets/*.exe
-            release-assets/*.zip
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
+          body_path: changelog.txt
+          draft: false
+          prerelease: false
+          files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────
+  # JOB 4: Tauri desktop build — DISABLED
+  #
+  # Placeholder for future cross-platform desktop
+  # app builds using Tauri (replacing Electron).
+  #
+  # To enable:
+  #   1. Run `npm create tauri-app` and commit src-tauri/
+  #   2. Generate a signing key: `tauri signer generate`
+  #   3. Add TAURI_PRIVATE_KEY + TAURI_KEY_PASSWORD to
+  #      repository secrets
+  #   4. Remove the `if: false` condition below
+  # ─────────────────────────────────────────────
+  tauri:
+    if: false   # disabled until src-tauri is scaffolded
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ needs.version.outputs.tag }}
+          releaseName: ${{ needs.version.outputs.tag }}
+          releaseDraft: false
+          prerelease: false
