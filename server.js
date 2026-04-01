@@ -45,6 +45,7 @@ const axios = require('axios'); // proxy for remote webcams
 const grblStrings = require('./grblStrings.js');
 const firmwareFeatures = require('./firmwareFeatures.js');
 const { exec } = require('child_process'); //Support for running OS commands before and after jobs
+const settings = require('./settings');
 
 exports.LWCommServer=function(config){
 
@@ -313,8 +314,31 @@ io.sockets.on('connection', function (appSocket) {
         } else {
             appSocket.emit('connectStatus', 'Connect');
         }
+        appSocket.emit('settingsData', settings.load());
+    });
+    // Send persisted UI settings to a newly connected client
+    appSocket.on('getSettings', function () {
+        writeLog(chalk.yellow('Connect (' + connections.indexOf(appSocket) + ') ') + chalk.blue('Sending settings'), 1);
+        const data = settings.load();
+        appSocket.emit('settingsData', data);
     });
 
+    // Save UI settings sent from a client, then broadcast to all
+    // connected clients so every open tab/browser stays in sync
+    appSocket.on('saveSettings', function (data) {
+        writeLog(chalk.yellow('Connect (' + connections.indexOf(appSocket) + ') ') + chalk.blue('Saving settings'), 1);
+        if (typeof data !== 'object' || data === null) {
+            appSocket.emit('error', 'saveSettings: invalid data');
+            return;
+        }
+        const ok = settings.save(data);
+        if (ok) {
+            // Broadcast to all clients so they stay in sync
+            io.sockets.emit('settingsData', data);
+        } else {
+            appSocket.emit('error', 'saveSettings: failed to write to disk');
+        }
+    });
     appSocket.on('getServerConfig', function () { // Deliver config of server (incl. versions)
         writeLog(chalk.yellow('INFO: ') + chalk.blue('Requesting Server Config '), 1);
         appSocket.emit('serverConfig', config);
@@ -1980,7 +2004,7 @@ io.sockets.on('connection', function (appSocket) {
     appSocket.on('jogTo', function (data) {     
         jogTo(data);
     });
-    
+
     appSocket.on('jogCancel', function () {
         writeLog(chalk.red('Jog Cancel'), 1);
         if (isConnected) {

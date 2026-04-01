@@ -49,3 +49,4 @@ dist
 # Local settings #
 ##################
 .env
+lw.settings.json
