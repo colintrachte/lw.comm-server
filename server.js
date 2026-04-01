@@ -701,7 +701,8 @@ io.sockets.on('connection', function (appSocket) {
 
                     } else if (data.indexOf('Grbl') === 0) { // Check if it's Grbl
                         firmware = 'grbl';
-                        fVersion = data.substr(5, 4); // get version
+                        var versionStart = data.indexOf(' ');
+                        fVersion = data.substr(versionStart, 4); // get version
                         fDate = '';
                         writeLog('GRBL detected (' + fVersion + ')', 1);
                         io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
@@ -3755,13 +3756,10 @@ function parseCommand(data) {
                                 break;
                             case "SPINDLE":
                                 return ({name: "spindleOverride", value: dist});
-                                break;
                             case "FEED":
                                 return ({name: "feedOverride", value: dist});
-                                break;
                             default:
                                 return ({name: "jog", value: [0x00, data[MPG_CMD_VELOCITY], 0x9a], gcode: "G1F100"})
-                                break;
                         }
                     }
                     return (CMDS[i]);
