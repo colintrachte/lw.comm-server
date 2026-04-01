@@ -1980,7 +1980,47 @@ io.sockets.on('connection', function (appSocket) {
     appSocket.on('jogTo', function (data) {     
         jogTo(data);
     });
-
+    
+    appSocket.on('jogCancel', function () {
+        writeLog(chalk.red('Jog Cancel'), 1);
+        if (isConnected) {
+            writeLog('Jog canceled and queue cleared', 1);
+            switch (firmware) {
+                case 'grbl':
+                case 'grblHAL':
+                    // 0x85 is grbl's real-time jog cancel byte — bypasses the queue
+                    machineSend(String.fromCharCode(0x85));
+                    writeLog('Sent: Jog Cancel (0x85)', 2);
+                    break;
+                case 'smoothie':
+                    // Smoothie doesn't have a dedicated jog cancel; send halt then resume
+                    machineSend('M112\n');
+                    writeLog('Sent: M112 (Smoothie halt)', 2);
+                    break;
+                case 'tinyg':
+                case 'g2core':
+                    // 0x04 (^D) is TinyG's feed hold, followed by queue flush
+                    machineSend(String.fromCharCode(0x04));
+                    machineSend('%\n');
+                    writeLog('Sent: Feed Hold + Queue Flush (TinyG)', 2);
+                    break;
+                case 'marlin':
+                case 'marlinkimbra':
+                case 'reprapfirmware':
+                    // Marlin/RepRap have no true jog cancel; stop the queue on our side
+                    gcodeQueue = [];
+                    writeLog('Jog queue cleared (no real-time cancel on this firmware)', 2);
+                    break;
+                default:
+                    writeLog(chalk.red('ERROR: ') + chalk.blue('jogCancel: Unknown firmware: ' + firmware), 1);
+                    break;
+            }
+        } else {
+            io.sockets.emit('connectStatus', 'closed');
+            io.sockets.emit('connectStatus', 'Connect');
+            writeLog(chalk.red('ERROR: ') + chalk.blue('Machine connection not open!'), 1);
+        }
+    });
     appSocket.on('setZero', function (data) {
         setZero(data);
     });
