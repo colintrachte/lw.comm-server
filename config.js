@@ -34,6 +34,6 @@ config.jobOnStart = '';
 config.jobOnFinish = '';
 config.jobOnAbort = '';
 
-config.uipath = path.join(__dirname, '/app')
+config.uipath = process.env.UI_PATH || path.join(__dirname, '/app')// in your .env file, set the path like so: UI_PATH=../LaserWeb4/dist
 
 module.exports = config;
