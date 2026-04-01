@@ -41,7 +41,7 @@ const nstatic = require('node-static');
 const url = require('url');
 const util = require('util');
 const chalk = require('chalk');
-const request = require('request'); // proxy for remote webcams
+const axios = require('axios'); // proxy for remote webcams
 const grblStrings = require('./grblStrings.js');
 const firmwareFeatures = require('./firmwareFeatures.js');
 const { exec } = require('child_process'); //Support for running OS commands before and after jobs
@@ -126,17 +126,26 @@ var app = http.createServer(function (req, res) {
     var queryData = url.parse(req.url, true).query;
     if (queryData.url) {
         if (queryData.url !== '') {
-            request({
-                url: queryData.url, // proxy for remote webcams
-                callback: function (err, res, body) {
-                    if (err) {
-                        // writeLog(err)
-                        console.error(chalk.red('ERROR:'), chalk.yellow(' Remote Webcam Proxy error: '), chalk.white('"' + queryData.url + '"'), chalk.yellow(' is not a valid URL: '));
-                    }
+            // proxy for remote webcams (axios replaces deprecated 'request')
+            axios({
+                method: 'get',
+                url: queryData.url,
+                responseType: 'stream',
+                timeout: 10000
+            }).then(function (axiosRes) {
+                if (axiosRes.headers['content-type']) {
+                    res.setHeader('Content-Type', axiosRes.headers['content-type']);
                 }
-            }).on('error', function (e) {
-                res.end(e);
-            }).pipe(res);
+                axiosRes.data.pipe(res);
+                axiosRes.data.on('error', function (e) {
+                    console.error(chalk.red('ERROR:'), chalk.yellow(' Remote Webcam Proxy stream error: '), chalk.white('"' + queryData.url + '"'), chalk.yellow(' ' + e.message));
+                    if (!res.headersSent) res.end();
+                });
+            }).catch(function (e) {
+                console.error(chalk.red('ERROR:'), chalk.yellow(' Remote Webcam Proxy error: '), chalk.white('"' + queryData.url + '"'), chalk.yellow(' ' + (e.message || 'is not a valid URL')));
+                if (!res.headersSent) res.writeHead(502);
+                res.end('Webcam proxy error: ' + (e.message || 'bad upstream URL'));
+            });
         }
     } else {
         webServer.serve(req, res, function (err, result) {
