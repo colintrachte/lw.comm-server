@@ -11,7 +11,7 @@ SyslogIdentifier=lw.comm-server
 WorkingDirectory=/home/pi/lw.comm-server
 User=pi
 #Group=<alternate group>
-Environment=NODE_ENV=production PORT=8000
+Environment=NODE_ENV=production WEB_PORT=8000
 
 [Install]
 WantedBy=multi-user.target
