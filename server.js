@@ -243,7 +243,7 @@ io.sockets.on('connection', function (appSocket) {
         writeLog(chalk.yellow('Connect(' + connections.indexOf(appSocket) + ') ') + chalk.blue('Sending Ports list: ' + portPaths), 1);
         appSocket.emit('ports', portsList);
     });
-    // reckeck ports every 2s
+    // recheck ports every 2s
     if (!listPortsLoop) {
         listPortsLoop = setInterval(function () {
             serialport.list().then(ports => {
@@ -461,7 +461,7 @@ io.sockets.on('connection', function (appSocket) {
                                 io.sockets.emit('connectStatus', 'closing:' + port.path);
                                 clearInterval(queueCounter);
                                 clearInterval(statusLoop);
-                                gcodeQueue.length = 0; // dump the queye
+                                gcodeQueue.length = 0; // dump the queue
                                 grblBufferSize.length = 0; // dump bufferSizes
                                 tinygBufferSize = TINYG_RX_BUFFER_SIZE; // reset tinygBufferSize
                                 reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -730,7 +730,7 @@ io.sockets.on('connection', function (appSocket) {
                         fDate = '';
                         writeLog('GRBL detected (' + fVersion + ')', 1);
                         io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                        // Start intervall for status queries
+                        // Start interval for status queries
                         statusLoop = setInterval(function () {
                             if (isConnected) {
                                 machineSend('?');
@@ -747,7 +747,7 @@ io.sockets.on('connection', function (appSocket) {
                         var dateString = fDate.toDateString();
                         writeLog('Smoothieware detected (' + fVersion + ', ' + dateString + ')', 1);
                         io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                        // Start intervall for status queries
+                        // Start interval for status queries
                         statusLoop = setInterval(function () {
                             if (isConnected) {
                                 machineSend('?');
@@ -765,7 +765,7 @@ io.sockets.on('connection', function (appSocket) {
                         fDate = '';
                         writeLog('Repetier detected (' + fVersion + ')', 1);
                         io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                        // Start intervall for status queries
+                        // Start interval for status queries
                         statusLoop = setInterval(function () {
                             if (isConnected) {
                                 if (!reprapWaitForPos && reprapBufferSize > 0) {
@@ -783,7 +783,7 @@ io.sockets.on('connection', function (appSocket) {
                         fDate = '';
                         writeLog('Marlin detected (' + fVersion + ')', 1);
                         io.sockets.emit('firmware', { firmware: firmware, version: fVersion, date: fDate });
-                        // Start intervall for status queries
+                        // Start interval for status queries
                         statusLoop = setInterval(function () {
                             if (isConnected) {
                                 if (!reprapWaitForPos && reprapBufferSize >= 0) {
@@ -801,7 +801,7 @@ io.sockets.on('connection', function (appSocket) {
                         fDate = '';
                         writeLog('MarlinKimbra detected (' + fVersion + ')', 1);
                         io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                        // Start intervall for status queries
+                        // Start interval for status queries
                         statusLoop = setInterval(function () {
                             if (isConnected) {
                                 if (!reprapWaitForPos && reprapBufferSize >= 0) {
@@ -822,7 +822,7 @@ io.sockets.on('connection', function (appSocket) {
                         reprapBufferSize = REPRAP_RX_BUFFER_SIZE;
                         writeLog('RepRapFirmware detected (' + fVersion + ')', 1);
                         io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                        // Start intervall for status queries
+                        // Start interval for status queries
                         statusLoop = setInterval(function () {
                             if (isConnected) {
                                 if (!reprapWaitForPos && reprapBufferSize > 0) {
@@ -837,7 +837,7 @@ io.sockets.on('connection', function (appSocket) {
                         try {
                             var jsObject = JSON.parse(data);
                         } catch(err) {
-                            console.error('Recieved invalid JSON response on connection:')
+                            console.error('Received invalid JSON response on connection:')
                             console.error(data)
                             var jsObject = "{}"
                         }
@@ -846,7 +846,7 @@ io.sockets.on('connection', function (appSocket) {
                             var responseText;
                             if (footer !== undefined) {
                                 if (footer[1] === 108) {
-                                    responseText = util.format("TinyG reported an syntax error reading '%s': %d (based on %d bytes read)", JSON.stringify(jsObject.r), footer[1], footer[2]);
+                                    responseText = util.format("TinyG reported a syntax error reading '%s': %d (based on %d bytes read)", JSON.stringify(jsObject.r), footer[1], footer[2]);
                                     io.sockets.emit('data', responseText);
                                     writeLog("Response: " + responseText + jsObject, 3);
                                 } else if (footer[1] === 20) {
@@ -854,7 +854,7 @@ io.sockets.on('connection', function (appSocket) {
                                     io.sockets.emit('data', responseText);
                                     writeLog("Response: " + responseText + jsObject, 3);
                                 } else if (footer[1] === 202) {
-                                    responseText = util.format("TinyG reported an TOO SHORT MOVE on line %d", jsObject.r.n);
+                                    responseText = util.format("TinyG reported a TOO SHORT MOVE on line %d", jsObject.r.n);
                                     io.sockets.emit('data', responseText);
                                     writeLog("Response: " + responseText + jsObject, 3);
                                 } else if (footer[1] === 204) {
@@ -946,7 +946,7 @@ io.sockets.on('connection', function (appSocket) {
                             fDate = '';
                             writeLog('TinyG detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                            // Start intervall for status queries
+                            // Start interval for status queries
 //                            statusLoop = setInterval(function () {
 //                                if (isConnected) {
 //                                    machineSend('{sr:n}\n');
@@ -1061,7 +1061,7 @@ io.sockets.on('connection', function (appSocket) {
                                 writeLog('No supported firmware detected. Closing connection to ' + connectedTo, 1);
                                 io.sockets.emit('data', 'No supported firmware detected. Closing connection to ' + connectedTo);
                                 io.sockets.emit('connectStatus', 'closing:' + connectedTo);
-                                gcodeQueue.length = 0; // dump the queye
+                                gcodeQueue.length = 0; // dump the queue
                                 grblBufferSize.length = 0; // dump bufferSizes
                                 tinygBufferSize = TINYG_RX_BUFFER_SIZE; // reset tinygBufferSize
                                 clearInterval(queueCounter);
@@ -1315,7 +1315,7 @@ io.sockets.on('connection', function (appSocket) {
                             fDate = '';
                             writeLog('GRBL detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                            // Start intervall for status queries
+                            // Start interval for status queries
                             statusLoop = setInterval(function () {
                                 if (isConnected) {
                                     machineSend('?');
@@ -1332,7 +1332,7 @@ io.sockets.on('connection', function (appSocket) {
                             var dateString = fDate.toDateString();
                             writeLog('Smoothieware detected (' + fVersion + ', ' + dateString + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                            // Start intervall for status queries
+                            // Start interval for status queries
                             statusLoop = setInterval(function () {
                                 if (isConnected) {
                                     machineSend('get status\n');
@@ -1349,7 +1349,7 @@ io.sockets.on('connection', function (appSocket) {
                             fDate = '';
                             writeLog('Repetier detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                            // Start intervall for status queries
+                            // Start interval for status queries
                             statusLoop = setInterval(function () {
                                 if (isConnected) {
                                     if (!reprapWaitForPos && reprapBufferSize > 0) {
@@ -1367,7 +1367,7 @@ io.sockets.on('connection', function (appSocket) {
                             fDate = '';
                             writeLog('MarlinKimbra detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                            // Start intervall for status queries
+                            // Start interval for status queries
                             statusLoop = setInterval(function () {
                                 if (isConnected) {
                                     if (!reprapWaitForPos && reprapBufferSize > 0) {
@@ -1385,7 +1385,7 @@ io.sockets.on('connection', function (appSocket) {
                             fDate = '';
                             writeLog('Marlin detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', { firmware: firmware, version: fVersion, date: fDate });
-                            // Start intervall for status queries
+                            // Start interval for status queries
                             statusLoop = setInterval(function () {
                                 if (isConnected) {
                                     if (!reprapWaitForPos && reprapBufferSize >= 0) {
@@ -1406,7 +1406,7 @@ io.sockets.on('connection', function (appSocket) {
                             reprapBufferSize = REPRAP_RX_BUFFER_SIZE;
                             writeLog('RepRapFirmware detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                            // Start intervall for status queries
+                            // Start interval for status queries
                             statusLoop = setInterval(function () {
                                 if (isConnected) {
                                     if (!reprapWaitForPos && reprapBufferSize >= 0) {
@@ -1517,7 +1517,7 @@ io.sockets.on('connection', function (appSocket) {
                                 writeLog('No supported firmware detected. Closing connection to ' + connectedTo, 1);
                                 io.sockets.emit('data', 'No supported firmware detected. Closing connection to ' + connectedTo);
                                 io.sockets.emit('connectStatus', 'closing:' + connectedTo);
-                                gcodeQueue.length = 0; // dump the queye
+                                gcodeQueue.length = 0; // dump the queue
                                 grblBufferSize.length = 0; // dump bufferSizes
                                 tinygBufferSize = TINYG_RX_BUFFER_SIZE; // reset tinygBufferSize
                                 reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -1717,7 +1717,7 @@ io.sockets.on('connection', function (appSocket) {
                                 fDate = '';
                                 writeLog('GRBL detected (' + fVersion + ')', 1);
                                 io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                                // Start intervall for status queries
+                                // Start interval for status queries
                                 statusLoop = setInterval(function () {
                                     if (isConnected) {
                                         machineSend('?');
@@ -1736,7 +1736,7 @@ io.sockets.on('connection', function (appSocket) {
                                 var dateString = fDate.toDateString();
                                 writeLog('Smoothieware detected (' + fVersion + ', ' + dateString + ')', 1);
                                 io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                                // Start intervall for status queries
+                                // Start interval for status queries
                                 statusLoop = setInterval(function () {
                                     if (isConnected) {
                                         machineSend('?');
@@ -1753,7 +1753,7 @@ io.sockets.on('connection', function (appSocket) {
                                 fDate = '';
                                 writeLog('Repetier detected (' + fVersion + ')', 1);
                                 io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                                // Start intervall for status queries
+                                // Start interval for status queries
                                 statusLoop = setInterval(function () {
                                     if (isConnected) {
                                         if (!reprapWaitForPos && reprapBufferSize > 0) {
@@ -1771,7 +1771,7 @@ io.sockets.on('connection', function (appSocket) {
                                 fDate = '';
                                 writeLog('MarlinKimbra detected (' + fVersion + ')', 1);
                                 io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                                // Start intervall for status queries
+                                // Start interval for status queries
                                 statusLoop = setInterval(function () {
                                     if (isConnected) {
                                         if (!reprapWaitForPos && reprapBufferSize > 0) {
@@ -1789,7 +1789,7 @@ io.sockets.on('connection', function (appSocket) {
                                 fDate = '';
                                 writeLog('Marlin detected (' + fVersion + ')', 1);
                                 io.sockets.emit('firmware', { firmware: firmware, version: fVersion, date: fDate });
-                                // Start intervall for status queries
+                                // Start interval for status queries
                                 statusLoop = setInterval(function () {
                                     if (isConnected) {
                                         if (!reprapWaitForPos && reprapBufferSize >= 0) {
@@ -1808,7 +1808,7 @@ io.sockets.on('connection', function (appSocket) {
                                 fDate = new Date(data.substr(startPos, 10));
                                 writeLog('RepRapFirmware detected (' + fVersion + ')', 1);
                                 io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                                // Start intervall for status queries
+                                // Start interval for status queries
                                 statusLoop = setInterval(function () {
                                     if (isConnected) {
                                         if (!reprapWaitForPos && reprapBufferSize >= 0) {
@@ -1823,7 +1823,7 @@ io.sockets.on('connection', function (appSocket) {
                                 try {
                                     var jsObject = JSON.parse(data);
                                 } catch(err) {
-                                    console.error('Recieved invalid JSON response on connection:')
+                                    console.error('Received invalid JSON response on connection:')
                                     console.error(data)
                                     var jsObject = "{}"
                                 }
@@ -1833,7 +1833,7 @@ io.sockets.on('connection', function (appSocket) {
                                         if (footer[1] === 108) {
                                             writeLog(
                                                 "Response: " +
-                                                util.format("TinyG reported an syntax error reading '%s': %d (based on %d bytes read)", JSON.stringify(jsObject.r), footer[1], footer[2]) +
+                                                util.format("TinyG reported a syntax error reading '%s': %d (based on %d bytes read)", JSON.stringify(jsObject.r), footer[1], footer[2]) +
                                                 jsObject, 3
                                             );
                                         } else if (footer[1] === 20) {
@@ -1845,7 +1845,7 @@ io.sockets.on('connection', function (appSocket) {
                                         } else if (footer[1] === 202) {
                                             writeLog(
                                                 "Response: " +
-                                                util.format("TinyG reported an TOO SHORT MOVE on line %d", jsObject.r.n) +
+                                                util.format("TinyG reported a TOO SHORT MOVE on line %d", jsObject.r.n) +
                                                 jsObject, 3
                                             );
                                         } else if (footer[1] === 204) {
@@ -1904,7 +1904,7 @@ io.sockets.on('connection', function (appSocket) {
                                     fDate = '';
                                     writeLog('TinyG detected (' + fVersion + ')', 1);
                                     io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
-                                    // Start intervall for status queries
+                                    // Start interval for status queries
                                     statusLoop = setInterval(function () {
                                         if (isConnected) {
                                             machineSend('{"sr":null}\n');
@@ -2116,7 +2116,7 @@ io.sockets.on('connection', function (appSocket) {
                 writeLog(chalk.yellow('WARN: ') + chalk.blue('Closing Port ' + port.path), 1);
                 io.sockets.emit("connectStatus", 'closing:' + port.path);
                 //machineSend(String.fromCharCode(0x18)); // ctrl-x
-                gcodeQueue.length = 0; // dump the queye
+                gcodeQueue.length = 0; // dump the queue
                 grblBufferSize.length = 0; // dump bufferSizes
                 tinygBufferSize = TINYG_RX_BUFFER_SIZE; // reset tinygBufferSize
                 reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -2129,7 +2129,7 @@ io.sockets.on('connection', function (appSocket) {
                 writeLog(chalk.yellow('WARN: ') + chalk.blue('Closing Telnet @ ' + connectedIp), 1);
                 io.sockets.emit("connectStatus", 'closing:' + connectedIp);
                 //machineSend(String.fromCharCode(0x18)); // ctrl-x
-                gcodeQueue.length = 0; // dump the queye
+                gcodeQueue.length = 0; // dump the queue
                 grblBufferSize.length = 0; // dump bufferSizes
                 tinygBufferSize = TINYG_RX_BUFFER_SIZE; // reset tinygBufferSize
                 reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -2142,7 +2142,7 @@ io.sockets.on('connection', function (appSocket) {
                 writeLog(chalk.yellow('WARN: ') + chalk.blue('Closing ESP @ ' + connectedIp), 1);
                 io.sockets.emit("connectStatus", 'closing:' + connectedIp);
                 //machineSend(String.fromCharCode(0x18)); // ctrl-x
-                gcodeQueue.length = 0; // dump the queye
+                gcodeQueue.length = 0; // dump the queue
                 grblBufferSize.length = 0; // dump bufferSizes
                 tinygBufferSize = TINYG_RX_BUFFER_SIZE; // reset tinygBufferSize
                 reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -2355,7 +2355,7 @@ io.sockets.on('connection', function (appSocket) {
 
     appSocket.on('sd.progress', function (data) {  // Get SD print progress
         if (isConnected) {
-            writeLog(chalk.red('sd.progtress'), 1);
+            writeLog(chalk.red('sd.progress'), 1);
             switch (firmware) {
             case 'smoothie':
                 machineSend('progress/n');
@@ -2432,7 +2432,7 @@ function runJob(data) {
                 }, 500);
                 io.sockets.emit('runStatus', 'running');
 
-                //NAB - Added to support action to run befor job starts
+                //NAB - Added to support action to run before job starts
                 doJobAction(config.jobOnStart);
 
                 send1Q();
@@ -2559,7 +2559,7 @@ function jog(data) {
     }
 }
 
-function jogTo(data) {     // data = {x:xVal, y:yVal, z:zVal, mode:0(absulute)|1(relative), feed:fVal}
+function jogTo(data) {     // data = {x:xVal, y:yVal, z:zVal, mode:0(absolute)|1(relative), feed:fVal}
     writeLog(chalk.red('JogTo ' + JSON.stringify(data)), 1);
     if (isConnected) {
         if (data.x !== undefined || data.y !== undefined || data.z !== undefined) {
@@ -3314,7 +3314,7 @@ function stopMachine() {
                 writeLog('Sent: Code(0x9E)', 2);
             }
             writeLog('Cleaning Queue', 1);
-            gcodeQueue.length = 0; // Dump the Queye
+            gcodeQueue.length = 0; // Dump the queue
             grblBufferSize.length = 0; // Dump bufferSizes
             queueLen = 0;
             queuePointer = 0;
@@ -3348,7 +3348,7 @@ function stopMachine() {
         }
         clearInterval(queueCounter);
         io.sockets.emit('qCount', 0);
-        gcodeQueue.length = 0; // Dump the Queye
+        gcodeQueue.length = 0; // Dump the queue
         grblBufferSize.length = 0; // Dump bufferSizes
         tinygBufferSize = TINYG_RX_BUFFER_SIZE;  // reset tinygBufferSize
         reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -3408,7 +3408,7 @@ function clearAlarm(data) { // Clear Alarm
             break;
         case 2:
             writeLog('Emptying Queue', 1);
-            gcodeQueue.length = 0; // Dump the Queye
+            gcodeQueue.length = 0; // Dump the queue
             grblBufferSize.length = 0; // Dump bufferSizes
             tinygBufferSize = TINYG_RX_BUFFER_SIZE;  // reset tinygBufferSize
             reprapBufferSize = REPRAP_RX_BUFFER_SIZE; // reset reprapBufferSize
@@ -3434,7 +3434,7 @@ function clearAlarm(data) { // Clear Alarm
                 paused = false;
                 break;
             case 'tinyg':
-                machineSend('%'); // flush tinyg quere
+                machineSend('%'); // flush tinyg queue
                 writeLog('Sent: %', 2);
                 //machineSend('~'); // resume
                 //writeLog('Sent: ~', 2);
@@ -3660,10 +3660,10 @@ function send1Q() {
                 writeLog("Elapsed time: " + elapsedTime + " seconds.", 1);
                 writeLog('Ave. Speed: ' + speed + ' lines/s', 1);
             }
-            gcodeQueue.length = 0; // Dump the Queye
+            gcodeQueue.length = 0; // Dump the queue
             grblBufferSize.length = 0; // Dump bufferSizes
             tinygBufferSize = TINYG_RX_BUFFER_SIZE;  // reset tinygBufferSize
-            reprapBufferSize = REPRAP_RX_BUFFER_SIZE;  // reset tinygBufferSize
+            reprapBufferSize = REPRAP_RX_BUFFER_SIZE;  // reset reprapBufferSize
             queueLen = 0;
             queuePointer = 0;
             queuePos = 0;
@@ -3978,31 +3978,31 @@ function parseMPGPacket(data) {
                     case("macro1"):
                         io.sockets.emit('mpg', {key: 'macro1'});
                         console.log("Macro1");
-                        runMarco(1);
+                        runMacro(1);
                         break;
                     
                     case("macro2"):
                         io.sockets.emit('mpg', {key: 'macro2'});
                         console.log("Macro2");
-                        runMarco(2);
+                        runMacro(2);
                         break;
                         
                     case("macro3"):
                         io.sockets.emit('mpg', {key: 'macro3'});
                         console.log("Macro3");
-                        runMarco(3);
+                        runMacro(3);
                         break;
 
                     case("macro6"):
                         io.sockets.emit('mpg', {key: 'macro6'});
                         console.log("Macro6");
-                        runMarco(6);
+                        runMacro(6);
                         break;
                         
                     case("macro7"):
                         io.sockets.emit('mpg', {key: 'macro7'});
                         console.log("Macro7");
-                        runMarco(7);
+                        runMacro(7);
                         break;
 
                     default:

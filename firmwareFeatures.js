@@ -136,7 +136,7 @@ exports.get = function (firmware) {
         case 'smoothie':
             return featuresSmoothie;
         case 'tinyg':
-            return featuresTyinG;
+            return featuresTinyG;
         case 'repetier':
             return featuresRepetier;
         case 'marlinkimbra':
