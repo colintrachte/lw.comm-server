@@ -129,9 +129,13 @@ var featuresNone = {
     aAxes: false
 };
 
-exports.get = function (firmware) {
+exports.get = function (firmware, version) {
     switch (firmware) {
         case 'grbl':
+            if (version && String(version).trimStart().indexOf('0.') === 0) {
+                // GRBL 0.x lacks real-time feed/spindle override commands
+                return Object.assign({}, featuresGrbl, { feedOverride: false, spindleOverride: false });
+            }
             return featuresGrbl;
         case 'smoothie':
             return featuresSmoothie;

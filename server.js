@@ -388,7 +388,7 @@ io.sockets.on('connection', function (appSocket) {
     });
 
     appSocket.on('getFeatureList', function (data) { // Deliver supported Firmware Features to Web-Client
-        appSocket.emit('featureList', firmwareFeatures.get(firmware));
+        appSocket.emit('featureList', firmwareFeatures.get(firmware, fVersion));
     });
 
     appSocket.on('getRunningJob', function (data) { // Deliver running Job to Web-Client
@@ -504,6 +504,9 @@ io.sockets.on('connection', function (appSocket) {
 
                 parser.on('data', function (data) {
                     //data = data.toString().trimStart();
+                    // Strip GRBL 0.x framing prefix {count/total} if present
+                    var framingMatch = data.match(/^\{\d+\/\d+\}(.*)/);
+                    if (framingMatch) { data = framingMatch[1]; }
                     writeLog('Recv: ' + data, 3);
                     if (data.indexOf('ok') === 0) { // Got an OK so we are clear to send
                         if (firmware === 'grbl') {
@@ -1309,9 +1312,10 @@ io.sockets.on('connection', function (appSocket) {
                                 io.sockets.emit('mPos', {x: mxpos, y: mypos, z: mzpos, a: mapos});
                                 setMpgMPos({x: mxpos, y: mypos, z: mzpos, a: mapos});
                             }
-                        } else if (data.indexOf('Grbl') === 0) { // Check if it's Grbl
+                        } else if (data.indexOf('Grbl') === 0) { // Check if it's Grbl (or GrblHAL)
                             firmware = 'grbl';
-                            fVersion = data.substr(5, 4); // get version
+                            var versionStart = data.indexOf(' ');
+                            fVersion = data.substr(versionStart, 4); // get version (works for both Grbl and GrblHAL)
                             fDate = '';
                             writeLog('GRBL detected (' + fVersion + ')', 1);
                             io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
@@ -1711,9 +1715,10 @@ io.sockets.on('connection', function (appSocket) {
                                 setMpgWPos({x: xPos, y: yPos, z: zPos, a: aPos});
                                 //writeLog('wPos: X:' + xPos + ' Y:' + yPos + ' Z:' + zPos + ' E:' + aPos, 3);
                                 reprapWaitForPos = false;
-                            } else if (data.indexOf('Grbl') === 0) { // Check if it's Grbl
+                            } else if (data.indexOf('Grbl') === 0) { // Check if it's Grbl (or GrblHAL)
                                 firmware = 'grbl';
-                                fVersion = data.substr(5, 4); // get version
+                                var versionStart = data.indexOf(' ');
+                                fVersion = data.substr(versionStart, 4); // get version (works for both Grbl and GrblHAL)
                                 fDate = '';
                                 writeLog('GRBL detected (' + fVersion + ')', 1);
                                 io.sockets.emit('firmware', {firmware: firmware, version: fVersion, date: fDate});
