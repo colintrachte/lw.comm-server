@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:20
 
 ADD config.js grblStrings.js firmwareFeatures.js LICENSE lw.comm-server.service package.json README.md server.js version.txt /laserweb/
 ADD app /laserweb/app/

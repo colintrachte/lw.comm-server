@@ -26,18 +26,16 @@
 */
 
 const config = require('./config');
-const serialport = require('serialport');
-var SerialPort = serialport;
-const Readline = SerialPort.parsers.Readline;
+const { SerialPort, ReadlineParser } = require('serialport');
 const websockets = require('socket.io');
 const http = require('http');
 const WebSocket = require('ws');
 const net = require('net');
 const os = require('os');
-const ip = require("ip");
 const fs = require('fs');
 const path = require('path');
-const nstatic = require('node-static');
+const serveStatic = require('serve-static');
+const finalhandler = require('finalhandler');
 const url = require('url');
 const util = require('util');
 const chalk = require('chalk');
@@ -99,7 +97,16 @@ var xPos = 0.00, yPos = 0.00, zPos = 0.00, aPos = 0.00;
 var xOffset = 0.00, yOffset = 0.00, zOffset = 0.00, aOffset = 0.00;
 var has4thAxis = false;
 
-var add = ip.address();
+function getLocalIP() {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+        for (const iface of ifaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+        }
+    }
+    return '127.0.0.1';
+}
+var add = getLocalIP();
 
 writeLog(chalk.green(' '), 0);
 writeLog(chalk.green('***************************************************************'), 0);
@@ -122,7 +129,7 @@ writeLog(chalk.green(' '), 0);
 
 
 // Init webserver
-var webServer = new nstatic.Server(config.uipath || path.join(__dirname, '/app'));
+var serveUI = serveStatic(config.uipath || path.join(__dirname, '/app'), { index: ['index.html'] });
 var app = http.createServer(function (req, res) {
     var queryData = url.parse(req.url, true).query;
     if (queryData.url) {
@@ -149,11 +156,11 @@ var app = http.createServer(function (req, res) {
             });
         }
     } else {
-        webServer.serve(req, res, function (err, result) {
-            if (err) {
+        serveUI(req, res, finalhandler(req, res, {
+            onerror: function (err) {
                 console.error(chalk.red('ERROR:'), chalk.yellow(' webServer error:' + req.url + ' : '), err.message);
             }
-        });
+        }));
     }
 });
 
@@ -234,7 +241,7 @@ io.sockets.on('connection', function (appSocket) {
     appSocket.emit('interfaces', supportedInterfaces);
 
     // check available ports
-    serialport.list().then(ports => {
+    SerialPort.list().then(ports => {
         portsList = ports;
         let portPaths= new Array();
         for (var i = 0; i < ports.length; i++) {
@@ -246,7 +253,7 @@ io.sockets.on('connection', function (appSocket) {
     // recheck ports every 2s
     if (!listPortsLoop) {
         listPortsLoop = setInterval(function () {
-            serialport.list().then(ports => {
+            SerialPort.list().then(ports => {
                 if (JSON.stringify(ports) != JSON.stringify(portsList)) {
                     portsList = ports;
                     io.sockets.emit('ports', portsList);
@@ -265,7 +272,7 @@ io.sockets.on('connection', function (appSocket) {
         if (port) {
             appSocket.emit('connectStatus', 'opened:' + port.path);
             appSocket.emit('activePort', port.path);
-            appSocket.emit('activeBaudRate', port.settings.baudRate);
+            appSocket.emit('activeBaudRate', port.baudRate);
         } else {
             appSocket.emit('connectStatus', 'opened:' + connectedTo);
             appSocket.emit('activeIP', connectedTo);
@@ -288,7 +295,7 @@ io.sockets.on('connection', function (appSocket) {
         writeLog(chalk.yellow('INFO: ') + chalk.blue('FirstLoad called'), 1);
         appSocket.emit('serverConfig', config);
         appSocket.emit('interfaces', supportedInterfaces);
-        serialport.list().then(ports => {
+        SerialPort.list().then(ports => {
             appSocket.emit('ports', ports);
         });
         if (isConnected) {
@@ -296,7 +303,7 @@ io.sockets.on('connection', function (appSocket) {
             switch (connectionType) {
             case 'usb':
                 appSocket.emit('activePort', port.path);
-                appSocket.emit('activeBaudRate', port.settings.baudRate);
+                appSocket.emit('activeBaudRate', port.baudRate);
                 break;
             case 'telnet':
                 appSocket.emit('activeIP', connectedTo);
@@ -351,7 +358,7 @@ io.sockets.on('connection', function (appSocket) {
 
     appSocket.on('getPorts', function () { // Refresh serial port list
         writeLog(chalk.yellow('INFO: ') + chalk.blue('Requesting Ports list '), 1);
-        serialport.list().then(ports => {
+        SerialPort.list().then(ports => {
             appSocket.emit('ports', ports);
         });
     });
@@ -363,7 +370,7 @@ io.sockets.on('connection', function (appSocket) {
             switch (connectionType) {
             case 'usb':
                 appSocket.emit('activePort', port.path);
-                appSocket.emit('activeBaudRate', port.settings.baudRate);
+                appSocket.emit('activeBaudRate', port.baudRate);
                 break;
             case 'telnet':
                 appSocket.emit('activeIP', connectedTo);
@@ -415,16 +422,17 @@ io.sockets.on('connection', function (appSocket) {
             firmware = false;
             switch (connectionType) {
             case 'usb':
-                port = new SerialPort(data[1], {
-                    baudRate: parseInt(data[2].replace('baud',''))
+                port = new SerialPort({
+                    path: data[1],
+                    baudRate: parseInt(data[2].replace('baud', ''))
                 });
-                const parser = port.pipe(new Readline({ delimiter: '\n' }))
+                const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
                 // parser.on('data', console.log)  // uncomment to dump raw data from the connected port
                 io.sockets.emit('connectStatus', 'opening:' + port.path);
 
                 // Serial port events -----------------------------------------------
                 port.on('open', function () {
-                    io.sockets.emit('activePort', {port: port.path, baudrate: port.settings.baudRate});
+                    io.sockets.emit('activePort', {port: port.path, baudrate: port.baudRate});
                     io.sockets.emit('connectStatus', 'opened:' + port.path);
                     if (reset) {
                         port.write(String.fromCharCode(0x18)); // ctrl-x (reset firmware)
@@ -472,7 +480,7 @@ io.sockets.on('connection', function (appSocket) {
                     }
                     //machineSend("M115\n");    // Lets check if its Marlin?
 
-                    writeLog(chalk.yellow('INFO: ') + 'Connected to ' + port.path + ' at ' + port.settings.baudRate, 1);
+                    writeLog(chalk.yellow('INFO: ') + 'Connected to ' + port.path + ' at ' + port.baudRate, 1);
                     isConnected = true;
                     connectedTo = port.path;
 
