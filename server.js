@@ -57,7 +57,7 @@ var port, parser, isConnected, connectedTo, portsList;
 var telnetSocket, espSocket, connectedIp;
 var telnetBuffer, espBuffer;
 
-var statusLoop, queueCounter, listPortsLoop = false;
+var statusLoop, queueCounter, listPortsLoop = false, listPortsBusy = false;
 var lastSent = '', paused = false, blocked = false;
 
 var firmware, fVersion, fDate;
@@ -94,6 +94,27 @@ var reprapBufferSize = REPRAP_RX_BUFFER_SIZE;               // init space left
 var reprapWaitForPos = false;
 
 var xPos = 0.00, yPos = 0.00, zPos = 0.00, aPos = 0.00;
+
+// Returns a wrapper around writeLog that suppresses repeated identical messages.
+// After the first log, subsequent calls within cooldownMs are silently counted;
+// the next call that falls outside the window prints one "was suppressed N times" notice.
+function makeThrottledLog(cooldownMs) {
+    var lastLog = 0;
+    var suppressed = 0;
+    return function throttled(line, verb) {
+        var now = Date.now();
+        if (now - lastLog >= cooldownMs) {
+            if (suppressed > 0) {
+                writeLog(chalk.yellow('[LOG SPAM GUARD: the previous message was suppressed ' + suppressed + ' additional time(s)]'), 1);
+                suppressed = 0;
+            }
+            lastLog = now;
+            writeLog(line, verb);
+        } else {
+            suppressed++;
+        }
+    };
+}
 var xOffset = 0.00, yOffset = 0.00, zOffset = 0.00, aOffset = 0.00;
 var has4thAxis = false;
 
@@ -128,6 +149,15 @@ writeLog(chalk.green('**********************************************************
 writeLog(chalk.green(' '), 0);
 
 
+// Throttled loggers — prevent specific high-frequency error paths from spamming the log.
+// Each suppresses repeated messages and emits a single "was suppressed N times" notice.
+var webcamStreamErrorLog = makeThrottledLog(5000);
+var portErrorLog = makeThrottledLog(5000);
+var send1QNotConnectedLog = makeThrottledLog(5000);
+var mpgReadErrorLog = makeThrottledLog(5000);
+var mpgWriteErrorLog = makeThrottledLog(5000);
+var jsonParseErrorLog = makeThrottledLog(5000);
+
 // Init webserver
 var serveUI = serveStatic(config.uipath || path.join(__dirname, '/app'), { index: ['index.html'] });
 var app = http.createServer(function (req, res) {
@@ -146,11 +176,11 @@ var app = http.createServer(function (req, res) {
                 }
                 axiosRes.data.pipe(res);
                 axiosRes.data.on('error', function (e) {
-                    console.error(chalk.red('ERROR:'), chalk.yellow(' Remote Webcam Proxy stream error: '), chalk.white('"' + queryData.url + '"'), chalk.yellow(' ' + e.message));
+                    webcamStreamErrorLog(chalk.red('ERROR: ') + chalk.yellow('Remote Webcam Proxy stream error "' + queryData.url + '": ' + e.message), 1);
                     if (!res.headersSent) res.end();
                 });
             }).catch(function (e) {
-                console.error(chalk.red('ERROR:'), chalk.yellow(' Remote Webcam Proxy error: '), chalk.white('"' + queryData.url + '"'), chalk.yellow(' ' + (e.message || 'is not a valid URL')));
+                writeLog(chalk.red('ERROR: ') + chalk.yellow('Remote Webcam Proxy error "' + queryData.url + '": ' + (e.message || 'bad upstream URL')), 1);
                 if (!res.headersSent) res.writeHead(502);
                 res.end('Webcam proxy error: ' + (e.message || 'bad upstream URL'));
             });
@@ -158,7 +188,7 @@ var app = http.createServer(function (req, res) {
     } else {
         serveUI(req, res, finalhandler(req, res, {
             onerror: function (err) {
-                console.error(chalk.red('ERROR:'), chalk.yellow(' webServer error:' + req.url + ' : '), err.message);
+                writeLog(chalk.red('ERROR: ') + chalk.yellow('webServer error ' + req.url + ': ' + err.message), 1);
             }
         }));
     }
@@ -170,6 +200,12 @@ if (config.IP == "0.0.0.0") {
     writeLog(chalk.yellow('Server binding to IP: ' + config.IP + ' on port: ' + config.webPort), 1);
 }
 app.listen(config.webPort, config.IP);
+app.on('error', function (err) {
+    writeLog(chalk.red('ERROR: ') + chalk.yellow('HTTP server failed to start: ' + err.message), 1);
+    if (err.code === 'EADDRINUSE') {
+        writeLog(chalk.red('ERROR: ') + chalk.yellow('Port ' + config.webPort + ' is already in use. Is another instance running?'), 1);
+    }
+});
 var io = websockets(app, {
     maxHttpBufferSize: config.socketMaxDataSize,
     cors: {
@@ -197,31 +233,34 @@ if (mpgType != 0){
             if (device.vendorId == vendorId && device.productId == productId){
                 if (!mpgRead) {
                     mpgRead = new HID.HID(device.path);
-                    console.log("HID read device: " + device.path);
+                    writeLog(chalk.cyan('MPG: HID read device opened: ' + device.path), 1);
                 } else {
                     mpgWrite = new HID.HID(device.path);
-                    console.log("HID write device: " + device.path);
-                    console.log(mpgWrite.getFeatureReport(6, 8));
+                    writeLog(chalk.cyan('MPG: HID write device opened: ' + device.path), 1);
+                    writeLog(chalk.cyan('MPG: feature report: ' + JSON.stringify(mpgWrite.getFeatureReport(6, 8))), 2);
                 }
             }
         });
+        if (!mpgRead) {
+            writeLog(chalk.yellow('MPG WARN: mpgType is "' + mpgType + '" but no matching HID device found (vendorId=0x' + vendorId.toString(16) + ' productId=0x' + productId.toString(16) + '). MPG will be inactive.'), 1);
+        }
         if (mpgRead) {
             mpgRead.on("data", function (data) {
-                writeLog(chalk.yellow('MPG read data: ' + JSON.stringify(data)), 1);
+                writeLog(chalk.yellow('MPG read data: ' + JSON.stringify(data)), 3);
                 if (data) {
                     parseMPGPacket(data);
                 }
             });
             mpgRead.on("error", function (data) {
-                writeLog(chalk.yellow('MPG read error: ' + JSON.stringify(data)), 1);
+                mpgReadErrorLog(chalk.red('MPG read error: ') + JSON.stringify(data), 1);
             });
         }
         if (mpgWrite) {
             mpgWrite.on("data", function (data) {
-                writeLog(chalk.yellow('MPG write data: ' + JSON.stringify(data)), 1);
+                writeLog(chalk.yellow('MPG write data: ' + JSON.stringify(data)), 3);
             });
             mpgWrite.on("error", function (data) {
-                writeLog(chalk.yellow('MPG write error: ' + JSON.stringify(data)), 1);
+                mpgWriteErrorLog(chalk.red('MPG write error: ') + JSON.stringify(data), 1);
             });
         }
         break;
@@ -249,11 +288,16 @@ io.sockets.on('connection', function (appSocket) {
         }
         writeLog(chalk.yellow('Connect(' + connections.indexOf(appSocket) + ') ') + chalk.blue('Sending Ports list: ' + portPaths), 1);
         appSocket.emit('ports', portsList);
+    }).catch(function (err) {
+        writeLog(chalk.red('ERROR: ') + chalk.yellow('Failed to list serial ports on connect: ' + err.message), 1);
     });
     // recheck ports every 2s
     if (!listPortsLoop) {
         listPortsLoop = setInterval(function () {
+            if (listPortsBusy) return; // skip if a previous list() call is still in flight
+            listPortsBusy = true;
             SerialPort.list().then(ports => {
+                listPortsBusy = false;
                 if (JSON.stringify(ports) != JSON.stringify(portsList)) {
                     portsList = ports;
                     io.sockets.emit('ports', portsList);
@@ -263,6 +307,9 @@ io.sockets.on('connection', function (appSocket) {
                     }
                     writeLog(chalk.yellow('Ports changed: ' + portPaths), 1);
                 }
+            }).catch(function (err) {
+                listPortsBusy = false;
+                writeLog(chalk.red('ERROR: ') + chalk.yellow('Failed to list serial ports: ' + err.message), 1);
             });
         }, 2000);
     }
@@ -297,6 +344,8 @@ io.sockets.on('connection', function (appSocket) {
         appSocket.emit('interfaces', supportedInterfaces);
         SerialPort.list().then(ports => {
             appSocket.emit('ports', ports);
+        }).catch(function (err) {
+            writeLog(chalk.red('ERROR: ') + chalk.yellow('Failed to list serial ports on firstLoad: ' + err.message), 1);
         });
         if (isConnected) {
             appSocket.emit('activeInterface', connectionType);
@@ -360,6 +409,8 @@ io.sockets.on('connection', function (appSocket) {
         writeLog(chalk.yellow('INFO: ') + chalk.blue('Requesting Ports list '), 1);
         SerialPort.list().then(ports => {
             appSocket.emit('ports', ports);
+        }).catch(function (err) {
+            writeLog(chalk.red('ERROR: ') + chalk.yellow('Failed to list serial ports on getPorts: ' + err.message), 1);
         });
     });
 
@@ -504,7 +555,7 @@ io.sockets.on('connection', function (appSocket) {
                 });
 
                 port.on('error', function (err) { // open errors will be emitted as an error event
-                    writeLog(chalk.red('PORT ERROR: ') + chalk.blue(err.message), 1);
+                    portErrorLog(chalk.red('PORT ERROR: ') + chalk.blue(err.message), 1);
                     io.sockets.emit('error', err.message);
                     io.sockets.emit('connectStatus', 'closed:');
                     io.sockets.emit('connectStatus', 'Connect');
@@ -848,8 +899,7 @@ io.sockets.on('connection', function (appSocket) {
                         try {
                             var jsObject = JSON.parse(data);
                         } catch(err) {
-                            console.error('Received invalid JSON response on connection:')
-                            console.error(data)
+                            jsonParseErrorLog(chalk.red('ERROR: ') + chalk.yellow('Received invalid JSON from firmware: ' + data), 1);
                             var jsObject = "{}"
                         }
                         if (jsObject.hasOwnProperty('r')) {
@@ -1836,8 +1886,7 @@ io.sockets.on('connection', function (appSocket) {
                                 try {
                                     var jsObject = JSON.parse(data);
                                 } catch(err) {
-                                    console.error('Received invalid JSON response on connection:')
-                                    console.error(data)
+                                    jsonParseErrorLog(chalk.red('ERROR: ') + chalk.yellow('Received invalid JSON from firmware: ' + data), 1);
                                     var jsObject = "{}"
                                 }
                                 if (jsObject.hasOwnProperty('r')) {
@@ -1977,6 +2026,7 @@ io.sockets.on('connection', function (appSocket) {
                 break;
             }
         } else {
+            writeLog(chalk.yellow('INFO: ') + chalk.blue('connectTo called but already connected via ' + connectionType + ' — ignoring'), 1);
             switch (connectionType) {
             case 'usb':
                 io.sockets.emit("connectStatus", 'opened:' + port.path);
@@ -2727,13 +2777,15 @@ function gotoZero(data) {
 function setPosition(data) {
     writeLog(chalk.red('setPosition(' + JSON.stringify(data) + ')'), 1);
     if (isConnected) {
-        if (data.x !== undefined || data.y !== undefined || data.z !== undefined) {
+        if (data.x !== undefined || data.y !== undefined || data.z !== undefined || data.a !== undefined) {
             var xVal = (data.x !== undefined ? 'X' + parseFloat(data.x) + ' ' : '');
             var yVal = (data.y !== undefined ? 'Y' + parseFloat(data.y) + ' ' : '');
             var zVal = (data.z !== undefined ? 'Z' + parseFloat(data.z) + ' ' : '');
             var aVal = (data.a !== undefined ? 'A' + parseFloat(data.a) + ' ' : '');
             addQ('G10 L20 P0 ' + xVal + yVal + zVal + aVal);
             send1Q();
+        } else {
+            writeLog(chalk.yellow('WARN: ') + chalk.blue('setPosition() called with no valid axis values — ignoring'), 1);
         }
     } else {
         io.sockets.emit("connectStatus", 'closed');
@@ -3527,16 +3579,21 @@ function grblBufferSpace() {
 
 
 function machineSend(gcode) {
-    switch (connectionType) {
-    case 'usb':
-        port.write(gcode);
-        break;
-    case 'telnet':
-        telnetSocket.write(gcode);
-        break;
-    case 'esp8266':
-        espSocket.send(gcode,{binary: false});
-        break;
+    writeLog(chalk.cyan('machineSend [' + connectionType + ']: ') + gcode.replace(/\n/g, '\\n'), 3);
+    try {
+        switch (connectionType) {
+        case 'usb':
+            port.write(gcode);
+            break;
+        case 'telnet':
+            telnetSocket.write(gcode);
+            break;
+        case 'esp8266':
+            espSocket.send(gcode, {binary: false});
+            break;
+        }
+    } catch (err) {
+        writeLog(chalk.red('ERROR: ') + chalk.yellow('machineSend [' + connectionType + '] write failed: ' + err.message), 1);
     }
 }
 
@@ -3691,7 +3748,7 @@ function send1Q() {
     } else {
         io.sockets.emit("connectStatus", 'closed');
         io.sockets.emit('connectStatus', 'Connect');
-        writeLog(chalk.red('ERROR: ') + chalk.blue('Error while send1Q(): Machine connection not open!'), 2);
+        send1QNotConnectedLog(chalk.red('ERROR: ') + chalk.blue('send1Q(): Machine connection not open!'), 1);
     }
 }
 
@@ -3797,7 +3854,7 @@ function doJogContinuous(dialSetting, cmd) {
     if(tmpCalc > calculatedVelocity){
         calculatedVelocity = tmpCalc; //If we are moving faster than previously we will increase our speed.
     }
-    console.log("SANE VELOCITY: " + velocity);
+    writeLog(chalk.cyan('MPG: sane velocity=' + velocity + ' calculatedVelocity=' + calculatedVelocity), 3);
     cmd.gcode = "G91\nG1F" + calculatedVelocity + dialSetting + sign + count + "\n";
     return (cmd);
 }
@@ -3857,7 +3914,7 @@ function parseMPGPacket(data) {
             //writeLog(tmpCmd, 3);
 
             if (tmpCmd) {
-                console.log("DIAL: " + dialSetting + " Command: " + tmpCmd.name, " Gcode: " + tmpCmd.gcode);
+                writeLog(chalk.cyan('MPG: dial=' + dialSetting + ' cmd=' + tmpCmd.name + ' gcode=' + tmpCmd.gcode), 3);
 
                 switch (tmpCmd.name) {
                     case("rewind"):
@@ -3876,7 +3933,7 @@ function parseMPGPacket(data) {
                         
                     case("safez"):
                         io.sockets.emit('mpg', {key: 'safez'});
-                        console.log("safez");
+                        writeLog(chalk.cyan('MPG: safez'), 1);
                         break;
                         
                     case("stop"):
@@ -3898,12 +3955,12 @@ function parseMPGPacket(data) {
                             }
 
                             machineSend("G90\n");
-                            console.log("::-----Exiting Jog Mode------::");
+                            writeLog(chalk.cyan('MPG: exiting jog mode'), 2);
                         }
                         break;
 
                     case("jog"):
-                        console.log("::-----Entering Jog Mode------::");
+                        writeLog(chalk.cyan('MPG: entering jog mode'), 2);
                         isJogging = true;
                         if (jogMode == "incremental") {
                             doJogIncremental(dialSetting, tmpCmd);
@@ -3923,17 +3980,17 @@ function parseMPGPacket(data) {
                     case("start_pause"):
                         io.sockets.emit('mpg', {key: 'start_pause'});
                         if (paused) {
-                            console.log("Sending Resume");
+                            writeLog(chalk.cyan('MPG: sending resume (~)'), 1);
                             machineSend('~');
                         } else {
                             machineSend('!');
-                            console.log("Sending Feedhold/Pause");
+                            writeLog(chalk.cyan('MPG: sending feedhold/pause (!)'), 1);
                         }
                         break;
 
                     case("half"):
                         io.sockets.emit('mpg', {key: 'half'});
-                        console.log("Half");
+                        writeLog(chalk.cyan('MPG: half'), 2);
                         break;
 
                     case("zero"):
@@ -3966,21 +4023,20 @@ function parseMPGPacket(data) {
                         io.sockets.emit('mpg', {key: 'stepsize'});
                         setStepDistance();
                         var stepSize = getStepDistance();
-                        console.log("Changing Step Rate for Incremental Mode to " + stepSize);
+                        writeLog(chalk.cyan('MPG: step rate changed to ' + stepSize), 2);
                         break;
 
                     case("model"):
-                        console.log("-----Changing Jog Modes----");
                         if (jogMode == "incremental") {
                             jogMode = "continuous";
                         } else {
                             jogMode = "incremental";
                         }
-                        console.log("MODE: " + jogMode);
+                        writeLog(chalk.cyan('MPG: jog mode changed to ' + jogMode), 2);
                         break;
 
                     case("sleep"):
-                        console.log("MPG goes sleep");
+                        writeLog(chalk.cyan('MPG: sleep'), 3);
                         break;
 
                     case('reset'):
@@ -3990,41 +4046,41 @@ function parseMPGPacket(data) {
                         
                     case("macro1"):
                         io.sockets.emit('mpg', {key: 'macro1'});
-                        console.log("Macro1");
+                        writeLog(chalk.cyan('MPG: macro1'), 1);
                         runMacro(1);
                         break;
                     
                     case("macro2"):
                         io.sockets.emit('mpg', {key: 'macro2'});
-                        console.log("Macro2");
+                        writeLog(chalk.cyan('MPG: macro2'), 1);
                         runMacro(2);
                         break;
                         
                     case("macro3"):
                         io.sockets.emit('mpg', {key: 'macro3'});
-                        console.log("Macro3");
+                        writeLog(chalk.cyan('MPG: macro3'), 1);
                         runMacro(3);
                         break;
 
                     case("macro6"):
                         io.sockets.emit('mpg', {key: 'macro6'});
-                        console.log("Macro6");
+                        writeLog(chalk.cyan('MPG: macro6'), 1);
                         runMacro(6);
                         break;
                         
                     case("macro7"):
                         io.sockets.emit('mpg', {key: 'macro7'});
-                        console.log("Macro7");
+                        writeLog(chalk.cyan('MPG: macro7'), 1);
                         runMacro(7);
                         break;
 
                     default:
-                        console.log("Un-Caught Case: " + tmpCmd.name, tmpCmd.value);
+                        writeLog(chalk.yellow('MPG WARN: uncaught command: ' + tmpCmd.name + ' value=' + JSON.stringify(tmpCmd.value)), 1);
                         break;
                 }
 
             } else {
-                console.log("DIAL: " + dialSetting + " Command Code Unknown: ", data);
+                writeLog(chalk.yellow('MPG WARN: dial=' + dialSetting + ' unknown command code: ' + JSON.stringify(Array.from(data))), 2);
             }
         }
         break;
@@ -4205,18 +4261,14 @@ function writeLog(line, verb) {
 //Handles performing any pre/post/abort actions
 //Action = command line specific for OS
 function doJobAction(action) {
-
-    //NAB - Added to support action to run after job completes
     if (typeof action === 'string' && action.length > 0) {
-        try {
-            exec(action);
-        } catch (e) {
-            //Unable to start jobAfter command
-            writeLog(chalk.red('ERROR: ') + chalk.blue('Error on job command: ' + e.message + ' for action: ' + action), 2);
-        }
-
+        writeLog(chalk.yellow('INFO: ') + chalk.blue('Running job action: ' + action), 1);
+        exec(action, function (err, stdout, stderr) {
+            if (stdout) writeLog(chalk.blue('Job action stdout: ') + stdout.trim(), 2);
+            if (stderr) writeLog(chalk.yellow('Job action stderr: ') + stderr.trim(), 2);
+            if (err) writeLog(chalk.red('ERROR: ') + chalk.blue('Job action failed (exit ' + err.code + '): ' + action), 1);
+        });
     }
-
 }
 
 }
