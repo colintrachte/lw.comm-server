@@ -13,108 +13,6 @@
       "template": "templates/AI_HARNESS.template.md",
       "installed_at": "2026-07-16T23:25:56+00:00"
     },
-    "helper_scripts/PMT/context_pack.py": {
-      "sha256": "3cc222d5434a4ed92c661322b14de9987d4204976c039a1e1dd46e03c86a11ad",
-      "template_sha256": "3cc222d5434a4ed92c661322b14de9987d4204976c039a1e1dd46e03c86a11ad",
-      "template": "helper_scripts/PMT/context_pack.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/doctor.py": {
-      "sha256": "3a0e2ec10377b81b463e70ef4efe81aaadf804282e543fc5fa0d3729fd889219",
-      "template_sha256": "3a0e2ec10377b81b463e70ef4efe81aaadf804282e543fc5fa0d3729fd889219",
-      "template": "helper_scripts/PMT/doctor.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/execution_receipts.py": {
-      "sha256": "838e6eb766d914f1b0bb5fb41f362218b2bd9efb81a7fa3eaf635c28491fc1e6",
-      "template_sha256": "838e6eb766d914f1b0bb5fb41f362218b2bd9efb81a7fa3eaf635c28491fc1e6",
-      "template": "helper_scripts/PMT/execution_receipts.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/execution_receipts.json": {
-      "sha256": "bc8e93fa58a848c69788c1b8179b7776a17e9598e1671594f50fdebd38c5b6b1",
-      "template_sha256": "bc8e93fa58a848c69788c1b8179b7776a17e9598e1671594f50fdebd38c5b6b1",
-      "template": "templates/seed.execution_receipts.json",
-      "installed_at": "2026-07-16T23:25:56+00:00"
-    },
-    "helper_scripts/PMT/executor_registry.json": {
-      "sha256": "56363a11dfe37f62720e65781817ab5830c7e6d6991606684277939f58edd5e0",
-      "template_sha256": "56363a11dfe37f62720e65781817ab5830c7e6d6991606684277939f58edd5e0",
-      "template": "helper_scripts/PMT/executor_registry.json",
-      "installed_at": "2026-07-16T23:25:56+00:00"
-    },
-    "helper_scripts/PMT/executor_registry.py": {
-      "sha256": "1411ef32c3abb10fa68419af2ff70b3eeb704689c88608448b75b6e386ea096b",
-      "template_sha256": "1411ef32c3abb10fa68419af2ff70b3eeb704689c88608448b75b6e386ea096b",
-      "template": "helper_scripts/PMT/executor_registry.py",
-      "installed_at": "2026-07-16T23:25:56+00:00"
-    },
-    "helper_scripts/PMT/external_refs.json": {
-      "sha256": "c6394fa66abe202055e10f4fe48a47ed41b80f638e8dd65f589282d04378c885",
-      "template_sha256": "c6394fa66abe202055e10f4fe48a47ed41b80f638e8dd65f589282d04378c885",
-      "template": "templates/seed.external_refs.json",
-      "installed_at": "2026-07-16T23:25:56+00:00"
-    },
-    "helper_scripts/PMT/gui_theme.py": {
-      "sha256": "2325268a263fa51b058fc2ca7799cef35d4e165be62f9a7e807e9f62da53335b",
-      "template_sha256": "2325268a263fa51b058fc2ca7799cef35d4e165be62f9a7e807e9f62da53335b",
-      "template": "helper_scripts/PMT/gui_theme.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/pack_delivery.py": {
-      "sha256": "41780d1e3b95338327920bc82bd6b819050b0e2fd9523807206e9fef084c9055",
-      "template_sha256": "41780d1e3b95338327920bc82bd6b819050b0e2fd9523807206e9fef084c9055",
-      "template": "helper_scripts/PMT/pack_delivery.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/pack_task.py": {
-      "sha256": "04877fb621402297deb37a66ea6bbf34fc545acd9e628aeea0ef164d73c306d9",
-      "template_sha256": "04877fb621402297deb37a66ea6bbf34fc545acd9e628aeea0ef164d73c306d9",
-      "template": "helper_scripts/PMT/pack_task.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/pmt_version.json": {
-      "sha256": "984ee5df922450b47f916c9bc7f2746180f73c18be79e06ae13e73e9a7e6bcd2",
-      "template_sha256": "984ee5df922450b47f916c9bc7f2746180f73c18be79e06ae13e73e9a7e6bcd2",
-      "template": "helper_scripts/PMT/pmt_version.json",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/query_model.py": {
-      "sha256": "d208a04570765e1b15bc520cf46a2b09c3f35999ea0e8eeaf18bb435e4060b56",
-      "template_sha256": "d208a04570765e1b15bc520cf46a2b09c3f35999ea0e8eeaf18bb435e4060b56",
-      "template": "helper_scripts/PMT/query_model.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/README.md": {
-      "sha256": "0a79e7cec8470034935c7f2dda5cbd2b0dccdffd58809401e78ef3cfc01453a9",
-      "template_sha256": "0a79e7cec8470034935c7f2dda5cbd2b0dccdffd58809401e78ef3cfc01453a9",
-      "template": "helper_scripts/PMT/README.md",
-      "installed_at": "2026-07-16T23:25:56+00:00"
-    },
-    "helper_scripts/PMT/route_tasks.py": {
-      "sha256": "d65f166993b46513f19cd5a55e37b4068a1633eef4d311c097cf289882b36126",
-      "template_sha256": "d65f166993b46513f19cd5a55e37b4068a1633eef4d311c097cf289882b36126",
-      "template": "helper_scripts/PMT/route_tasks.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/task_editor.py": {
-      "sha256": "81f8d885f1ceb00d4dca22b6c3d66c0f4bd3da5ceffffef5c82fee47adbddd78",
-      "template_sha256": "81f8d885f1ceb00d4dca22b6c3d66c0f4bd3da5ceffffef5c82fee47adbddd78",
-      "template": "helper_scripts/PMT/task_editor.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/task_records.py": {
-      "sha256": "81ffd02147abddc7fc4232eec0c6884f5280d456603393b6d712330ecc85a24c",
-      "template_sha256": "81ffd02147abddc7fc4232eec0c6884f5280d456603393b6d712330ecc85a24c",
-      "template": "helper_scripts/PMT/task_records.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/context_load_ceiling.txt": {
-      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
-      "template_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
-      "template": "templates/seed.context_load_ceiling.txt",
-      "installed_at": "2026-07-16T23:25:56+00:00"
-    },
     "CONTRIBUTING.md": {
       "sha256": "f6e376aa1d560d2113662ff43bb32f1ca66b3b8abdb0102357262be14debc153",
       "template_sha256": "f6e376aa1d560d2113662ff43bb32f1ca66b3b8abdb0102357262be14debc153",
@@ -143,18 +41,6 @@
       "sha256": "64bc29e0faa50134537a6012b606c89daa4a251acf2850f5b49d468b9cce2907",
       "template_sha256": "64bc29e0faa50134537a6012b606c89daa4a251acf2850f5b49d468b9cce2907",
       "template": "templates/IN_PROCESSING.template.md",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/dashboard.py": {
-      "sha256": "269c5e88ece909ad1361d6c473e343eeccf3b52d86c7f42155b93f67f743d8b0",
-      "template_sha256": "269c5e88ece909ad1361d6c473e343eeccf3b52d86c7f42155b93f67f743d8b0",
-      "template": "helper_scripts/PMT/dashboard.py",
-      "installed_at": "2026-10-02T12:35:26+00:00"
-    },
-    "helper_scripts/PMT/scoring.py": {
-      "sha256": "2ce6804667b72360560747f6cd8a676881c69e7537652080c511a9ebf949aa64",
-      "template_sha256": "2ce6804667b72360560747f6cd8a676881c69e7537652080c511a9ebf949aa64",
-      "template": "helper_scripts/PMT/scoring.py",
       "installed_at": "2026-10-02T12:35:26+00:00"
     }
   }
